@@ -1,0 +1,66 @@
+{
+  "info": {
+    "name": "SmartDoc Backend",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth - Signup",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/v1/auth/signup", "host": ["{{baseUrl}}"], "path": ["api","v1","auth","signup"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"fullName\": \"Jane Doe\",\n  \"workEmail\": \"jane@company.com\",\n  \"password\": \"StrongPass#123\",\n  \"acceptedTerms\": true\n}"
+        }
+      }
+    },
+    {
+      "name": "Auth - Signin",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/v1/auth/signin", "host": ["{{baseUrl}}"], "path": ["api","v1","auth","signin"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"jane@company.com\",\n  \"password\": \"StrongPass#123\",\n  \"rememberMe\": true\n}"
+        }
+      }
+    },
+    {
+      "name": "Users - Me",
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/v1/users/me", "host": ["{{baseUrl}}"], "path": ["api","v1","users","me"] }
+      }
+    },
+    {
+      "name": "AI - Ask Question (Placeholder)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{accessToken}}" },
+          { "key": "Content-Type", "value": "application/json" }
+        ],
+        "url": { "raw": "{{baseUrl}}/api/v1/ai/questions", "host": ["{{baseUrl}}"], "path": ["api","v1","ai","questions"] },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"What liabilities are missing?\",\n  \"documents\": [\n    {\n      \"id\": 12,\n      \"name\": \"contract-v3.pdf\",\n      \"size\": \"1.2 MB\",\n      \"mimeType\": \"application/pdf\"\n    }\n  ]\n}"
+        }
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "accessToken", "value": "" }
+  ]
+}
+
