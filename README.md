@@ -33,6 +33,44 @@ cd C:\Users\seifa\Documents\smartdoc
 .\mvnw.cmd spring-boot:run
 ```
 
+## Docker Compose stack
+
+This repository now includes a Docker Compose setup for the full SmartDoc stack:
+
+- `smartdoc` on port `8087`
+- `AiSmartDoc` on port `8088`
+- `smartdoc-ai` on port `8000`
+- `postgres` on port `5432`
+- `kafka` on port `9092`
+
+### Start everything
+
+```powershell
+cd C:\Users\seifa\Documents\smartdoc
+Copy-Item .env.example .env
+docker compose up --build
+```
+
+### Start in detached mode
+
+```powershell
+cd C:\Users\seifa\Documents\smartdoc
+docker compose up -d --build
+```
+
+### Stop everything
+
+```powershell
+cd C:\Users\seifa\Documents\smartdoc
+docker compose down
+```
+
+### Notes
+
+- Copy `.env.example` to `.env` and fill in your own values before starting the stack.
+- Uploaded files are persisted through the host `uploads/` folder.
+- Kafka is included for the audit stream; `smartdoc` uses `kafka:9092` inside Compose by default.
+
 ## One-click relaunch and verification
 
 To stop any existing listeners, relaunch the three-app stack, and run the AI integration checks:
@@ -77,4 +115,3 @@ For production, set environment variables or externalized properties for DB cred
 ## Kafka audit stream
 
 The backend now publishes best-effort audit events for document uploads/deletes and AI question flows. The default broker is `localhost:9092`; override it with `KAFKA_BOOTSTRAP_SERVERS` when running against a real cluster.
-

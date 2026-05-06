@@ -1,0 +1,156 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: smartdoc-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-SmartDoc}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-SmartDoc}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
+  kafka:
+    image: apache/kafka:3.8.1
+    container_name: smartdoc-kafka
+    restart: unless-stopped
+    environment:
+      KAFKA_CLUSTER_ID: ${KAFKA_CLUSTER_ID:-4L6g3nShT-eMCtK--X86sw}
+      KAFKA_NODE_ID: 0
+      KAFKA_PROCESS_ROLES: controller,broker
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
+      KAFKA_LISTENERS: PLAINTEXT://:9092,CONTROLLER://:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_MIN_INSYNC_REPLICAS: 1
+      KAFKA_LOG_DIRS: /tmp/kraft-combined-logs
+      KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
+    ports:
+      - "${KAFKA_PORT:-9092}:9092"
+    volumes:
+      - kafka_data:/tmp/kraft-combined-logs
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/kafka/bin/kafka-topics.sh --bootstrap-server localhost:9092 --list >/dev/null 2>&1"
+        ]
+      interval: 10s
+      timeout: 10s
+      retries: 15
+      start_period: 30s
+
+  smartdoc-ai:
+    build:
+      context: ./smartdoc-ai
+      dockerfile: Dockerfile
+    image: smartdoc-ai:local
+    container_name: smartdoc-ai
+    restart: unless-stopped
+    environment:
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      SERVICE_TOKEN: ${SERVICE_TOKEN:-smartdoc-dev-token}
+      MODEL_NAME: ${MODEL_NAME:-gemini-3.1}
+      CHUNK_SIZE_WORDS: ${CHUNK_SIZE_WORDS:-220}
+      CHUNK_OVERLAP_WORDS: ${CHUNK_OVERLAP_WORDS:-30}
+      RETRIEVAL_TOP_K: ${RETRIEVAL_TOP_K:-5}
+    ports:
+      - "${SMARTDOC_AI_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 10s
+
+  aismartdoc:
+    build:
+      context: ./AiSmartDoc
+      dockerfile: Dockerfile
+    image: aismartdoc:local
+    container_name: aismartdoc
+    restart: unless-stopped
+    environment:
+      APP_AI_BASE_URL: ${APP_AI_BASE_URL:-http://smartdoc-ai:8000}
+      APP_AI_SERVICE_TOKEN: ${SERVICE_TOKEN:-smartdoc-dev-token}
+      APP_AI_CONNECT_TIMEOUT_MS: ${APP_AI_CONNECT_TIMEOUT_MS:-3000}
+      APP_AI_READ_TIMEOUT_MS: ${APP_AI_READ_TIMEOUT_MS:-15000}
+    ports:
+      - "${AISMARTDOC_PORT:-8088}:8088"
+    depends_on:
+      smartdoc-ai:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:8088/api/v1/ai/health > /dev/null"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  smartdoc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: smartdoc:local
+    container_name: smartdoc
+    restart: unless-stopped
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-SmartDoc}?binaryTransfer=true&stringtype=unspecified
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-admin}
+      APP_JWT_SECRET: ${APP_JWT_SECRET:-change-me-to-a-long-random-secret}
+      APP_AI_GATEWAY_BASE_URL: ${APP_AI_GATEWAY_BASE_URL:-http://aismartdoc:8088/api/v1/ai}
+      APP_AI_GATEWAY_SERVICE_TOKEN: ${SERVICE_TOKEN:-smartdoc-dev-token}
+      KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:9092}
+      APP_KAFKA_AUDIT_TOPIC: ${APP_KAFKA_AUDIT_TOPIC:-smartdoc.audit.events}
+      APP_KAFKA_CLIENT_ID: ${APP_KAFKA_CLIENT_ID:-smartdoc}
+    ports:
+      - "${SMARTDOC_PORT:-8087}:8087"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      aismartdoc:
+        condition: service_healthy
+    volumes:
+      - ./uploads:/app/uploads
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://127.0.0.1:8087/v3/api-docs > /dev/null"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+volumes:
+  postgres_data:
+  kafka_data:
+
