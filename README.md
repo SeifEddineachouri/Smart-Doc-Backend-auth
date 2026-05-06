@@ -40,6 +40,7 @@ This repository now includes a Docker Compose setup for the full SmartDoc stack:
 - `smartdoc` on port `8087`
 - `AiSmartDoc` on port `8088`
 - `smartdoc-ai` on port `8000`
+- `frontend` on port `4200`
 - `postgres` on port `5432`
 - `kafka` on port `9092`
 
@@ -70,6 +71,11 @@ docker compose down
 - Copy `.env.example` to `.env` and fill in your own values before starting the stack.
 - Uploaded files are persisted through the host `uploads/` folder.
 - Kafka is included for the audit stream; `smartdoc` uses `kafka:9092` inside Compose by default.
+- The Angular frontend is served from the local `smartdoc-frontend:local` image and proxies `/api/v1` to `smartdoc:8087`.
+
+### Frontend URL
+
+- `http://localhost:4200`
 
 ### End-to-end verification
 
