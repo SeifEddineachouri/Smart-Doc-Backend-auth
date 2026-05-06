@@ -71,6 +71,32 @@ docker compose down
 - Uploaded files are persisted through the host `uploads/` folder.
 - Kafka is included for the audit stream; `smartdoc` uses `kafka:9092` inside Compose by default.
 
+### End-to-end verification
+
+Use the smoke test script to verify the full stack after a build or a Docker Hub publish:
+
+```powershell
+cd C:\Users\seifa\Documents\smartdoc
+.\verify-smartdoc-stack.ps1 -SkipRemotePull
+```
+
+To also verify that the published Docker Hub images can be pulled successfully:
+
+```powershell
+cd C:\Users\seifa\Documents\smartdoc
+.\verify-smartdoc-stack.ps1 -DockerHubNamespace <your-dockerhub-namespace>
+```
+
+The script checks:
+
+- local images exist or can be rebuilt
+- PostgreSQL is healthy and reachable
+- Kafka is healthy and responding
+- `smartdoc-ai` health endpoint
+- `AiSmartDoc` health endpoint
+- `smartdoc` OpenAPI endpoint
+- optional Docker Hub pulls for the three published images
+
 ## Docker Hub publishing
 
 The repository includes a GitHub Actions workflow that publishes the three service images to Docker Hub.

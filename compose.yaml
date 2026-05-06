@@ -23,7 +23,7 @@ services:
     container_name: smartdoc-kafka
     restart: unless-stopped
     environment:
-      KAFKA_CLUSTER_ID: ${KAFKA_CLUSTER_ID:-4L6g3nShT-eMCtK--X86sw}
+      CLUSTER_ID: ${CLUSTER_ID:-4L6g3nShT-eMCtK--X86sw}
       KAFKA_NODE_ID: 0
       KAFKA_PROCESS_ROLES: controller,broker
       KAFKA_CONTROLLER_QUORUM_VOTERS: 0@kafka:9093
@@ -41,8 +41,6 @@ services:
       KAFKA_HEAP_OPTS: -Xms256m -Xmx512m
     ports:
       - "${KAFKA_PORT:-9092}:9092"
-    volumes:
-      - kafka_data:/tmp/kraft-combined-logs
     healthcheck:
       test:
         [
@@ -152,5 +150,4 @@ services:
 
 volumes:
   postgres_data:
-  kafka_data:
 
