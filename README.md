@@ -71,6 +71,45 @@ docker compose down
 - Uploaded files are persisted through the host `uploads/` folder.
 - Kafka is included for the audit stream; `smartdoc` uses `kafka:9092` inside Compose by default.
 
+## Docker Hub publishing
+
+The repository includes a GitHub Actions workflow that publishes the three service images to Docker Hub:
+
+- `smartdoc` → `docker.io/<namespace>/smartdoc-backend-auth`
+- `AiSmartDoc` → `docker.io/<namespace>/smartdoc-backend-fast-api`
+- `smartdoc-ai` → `docker.io/<namespace>/smartdoc-backend-python`
+
+### Required GitHub secrets
+
+Configure these secrets in the GitHub repository before enabling the workflow:
+
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`
+
+Optional repository variable:
+
+- `DOCKERHUB_NAMESPACE` — overrides the Docker Hub namespace used for the published images
+
+### Tags that are published
+
+- `latest` on pushes to `main`
+- `sha-<git-sha>` on every publication
+- `vX.Y.Z` when pushing a Git tag like `v1.0.0`
+
+### How to trigger
+
+- push to `main`
+- push a version tag such as `v1.0.0`
+- run the workflow manually from the GitHub Actions tab
+
+### Pull the images
+
+```powershell
+docker pull <namespace>/smartdoc-backend-auth:latest
+docker pull <namespace>/smartdoc-backend-fast-api:latest
+docker pull <namespace>/smartdoc-backend-python:latest
+```
+
 ## One-click relaunch and verification
 
 To stop any existing listeners, relaunch the three-app stack, and run the AI integration checks:
