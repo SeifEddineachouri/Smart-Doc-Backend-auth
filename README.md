@@ -73,7 +73,10 @@ docker compose down
 
 ## Docker Hub publishing
 
-The repository includes a GitHub Actions workflow that publishes the three service images to Docker Hub:
+The repository includes a GitHub Actions workflow that publishes the three service images to Docker Hub.
+It validates the required secrets first, uses a safe namespace fallback, and publishes only from trusted Git events.
+
+The published images are:
 
 - `smartdoc` → `docker.io/<namespace>/smartdoc-backend-auth`
 - `AiSmartDoc` → `docker.io/<namespace>/smartdoc-backend-fast-api`
@@ -88,13 +91,15 @@ Configure these secrets in the GitHub repository before enabling the workflow:
 
 Optional repository variable:
 
-- `DOCKERHUB_NAMESPACE` — overrides the Docker Hub namespace used for the published images
+- `DOCKERHUB_NAMESPACE` — overrides the Docker Hub namespace used for the published images. If omitted, the workflow falls back to `DOCKERHUB_USERNAME`.
+
+Make sure the target repositories already exist in Docker Hub under that namespace.
 
 ### Tags that are published
 
 - `latest` on pushes to `main`
 - `sha-<git-sha>` on every publication
-- `vX.Y.Z` when pushing a Git tag like `v1.0.0`
+- `vX.Y.Z` from the Git tag itself, plus `X.Y.Z` and `X.Y` aliases when pushing a Git tag like `v1.2.3`
 
 ### How to trigger
 

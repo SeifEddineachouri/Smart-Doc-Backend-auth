@@ -8,8 +8,12 @@ on:
       - 'v*'
   workflow_dispatch:
 
-env:
-  DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE != '' && vars.DOCKERHUB_NAMESPACE || secrets.DOCKERHUB_USERNAME }}
+permissions:
+  contents: read
+
+concurrency:
+  group: dockerhub-publish-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -32,6 +36,26 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Prepare Docker Hub namespace
+        shell: bash
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_NAMESPACE: ${{ vars.DOCKERHUB_NAMESPACE }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${DOCKERHUB_USERNAME:-}" ]]; then
+            echo "Missing required secret DOCKERHUB_USERNAME" >&2
+            exit 1
+          fi
+
+          NAMESPACE="${DOCKERHUB_NAMESPACE:-$DOCKERHUB_USERNAME}"
+          if [[ -z "$NAMESPACE" ]]; then
+            echo "Docker Hub namespace cannot be empty" >&2
+            exit 1
+          fi
+
+          echo "DOCKERHUB_NAMESPACE=$NAMESPACE" >> "$GITHUB_ENV"
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -50,6 +74,8 @@ jobs:
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
             type=ref,event=tag
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
             type=sha,prefix=sha-
 
       - name: Build and push ${{ matrix.service }}
@@ -62,4 +88,3 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
-
