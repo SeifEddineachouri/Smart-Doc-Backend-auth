@@ -1,0 +1,110 @@
+# Jenkins Plugins Requirements for SmartDoc CI/CD Pipeline
+# Install these plugins for optimal CI/CD pipeline functionality
+
+# Core Plugins
+- jenkins:2.426.3
+- credentials:1339.v0dccb14c47f1
+- credentials-binding:645.vf5a7b93d4a4a
+- user-build-name-updater:1.5
+- build-name-updater:1.7.3
+
+# SCM Plugins
+- git:5.2.0
+- git-parameter:0.9.22
+- github:1.37.1
+- github-branch-source:1.8.8
+- github-api:1.314.v8dcbe0bf5d37
+
+# Pipeline Plugins
+- workflow-aggregator:597.v6144b_e51b_3cd
+- pipeline-model-definition:2.2131.v0b_a_8c8d973d3
+- pipeline-model-extensions:2.2131.v0b_a_8c8d973d3
+- pipeline-stage-view:293.v71913b_b_d5a_6a
+- pipeline-stage-tags-metadata:2.2131.v0b_a_8c8d973d3
+- pipeline-graph-analysis:195.v5812d95a_a_2f9
+- pipeline-rest-api:2.26
+- blueocean:1.27.5
+- blueocean-dashboard:1.27.5
+- blueocean-pipeline-scm-api:1.27.5
+- blueocean-git-pipeline:1.27.5
+- blueocean-github-pipeline:1.27.5
+- blueocean-config:1.27.5
+- blueocean-core-js:1.27.5
+- blueocean-commons:1.27.5
+- blueocean-events:1.27.5
+- blueocean-jira-integration:1.27.5
+- blueocean-jwt:1.27.5
+- blueocean-web:1.27.5
+- blueocean-personalization:1.27.5
+- blueocean-rest:1.27.5
+- blueocean-rest-impl:1.27.5
+
+# Docker Plugins
+- docker-plugin:1.5.3
+- docker-workflow:561.v02e7a_2da_012
+- docker-commons:1.21
+
+# Build Plugins
+- maven-plugin:3.22
+- maven-invoker-plugin:2.4
+- jacoco:3.6
+- cobertura:1.16
+
+# Code Quality Plugins
+- sonar:2.15
+- sonarqube-generic-coverage:1.4
+- checkstyle:1.52
+- findbugs:5.0.0
+- pmd:5.7
+- violations:0.7.4
+- spotbugs:4.8.0
+
+# Kubernetes Plugins
+- kubernetes:1.31.3
+- kubernetes-cli:1.12.2
+- kubernetes-credentials-provider:0.9.0
+
+# Monitoring & Logging
+- timestamper:1.17
+- log-parser:2.1
+- simple-build-wrapper-plugin:1.0
+
+# Notification Plugins
+- slack:664.ve545a_3b_66e3e
+- email-ext:2.102
+- github-autostatus:3.10.3
+- notification:1.16
+
+# Security Plugins
+- authorize-project:1.4.0
+- matrix-auth:3.1.6
+- saml:2.11.3
+- oic:1.9
+
+# Additional Utilities
+- configuration-as-code:1708.v263094de3a_7d
+- configuration-as-code-support:1.26
+- jdk-tool:63.v62a_a_01284f5c
+- greenballs:2.2.2
+- antisamy-markup-formatter:162.v0e6ec0fcfdf0
+- htmlpublisher:1.32
+- performance:3.20
+- metrics:4.2.20-h3
+- pipeline-stage-step:305.ve4a_4ec0ae17e
+- pipeline-input-step:485.v14ecf6722f63
+- pipeline-milestone-step:111.v449306f708b_7
+- lockable-resources:2.14
+- resource-disposer:0.20
+- cloudbees-folder:6.779.v34dadc305b_51
+- junit:1.57
+- email-ext:2.102
+- jira:3.12.1
+- http_request:1.14.8
+- postbuild-task:1.8
+- ws-cleanup:0.43
+- log-command-executor:1.2
+- envinject:2.870.v1e95f4a_04a_25
+
+# Note: Update versions to latest stable releases when installing
+# To install: Manage Jenkins → Manage Plugins → Available Plugins
+# Or use Jenkins Configuration as Code (JCasC) yaml configuration

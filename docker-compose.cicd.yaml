@@ -1,0 +1,144 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: smartdoc-postgres
+    environment:
+      POSTGRES_DB: smartdoc
+      POSTGRES_USER: smartdoc
+      POSTGRES_PASSWORD: smartdoc123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - smartdoc-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartdoc"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # SonarQube
+  sonarqube:
+    image: sonarqube:10.0-community
+    container_name: smartdoc-sonarqube
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://postgres:5432/smartdoc
+      SONAR_JDBC_USERNAME: smartdoc
+      SONAR_JDBC_PASSWORD: smartdoc123
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLED: "true"
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - smartdoc-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/system/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Jenkins Master
+  jenkins:
+    image: jenkins/jenkins:2.426.3-jdk17
+    container_name: smartdoc-jenkins
+    environment:
+      JENKINS_OPTS: "-Djenkins.install.runSetupWizard=false -Dhudson.security.csrf.GlobalCrumbIssuerConfiguration.DISABLE_CSRF_PROTECTION=false"
+      CASC_JENKINS_CONFIG: /var/jenkins_home/casc_configs
+      DOCKER_HOST: unix:///var/run/docker.sock
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./jenkins-config:/var/jenkins_home/casc_configs
+      - ./Jenkinsfile:/var/jenkins_home/Jenkinsfile
+    depends_on:
+      sonarqube:
+        condition: service_healthy
+    networks:
+      - smartdoc-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/json"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Kafka for event streaming
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: smartdoc-kafka
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+    networks:
+      - smartdoc-net
+    healthcheck:
+      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "kafka:29092"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Zookeeper for Kafka
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: smartdoc-zookeeper
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    ports:
+      - "2181:2181"
+    networks:
+      - smartdoc-net
+    healthcheck:
+      test: ["CMD", "echo", "ruok", "|", "nc", "localhost", "2181"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Docker-in-Docker for Jenkins
+  dind:
+    image: docker:24-dind
+    container_name: smartdoc-dind
+    privileged: true
+    ports:
+      - "2375:2375"
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    volumes:
+      - dind_data:/var/lib/docker
+    networks:
+      - smartdoc-net
+    healthcheck:
+      test: ["CMD", "docker", "ps"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  postgres_data:
+  sonarqube_data:
+  sonarqube_logs:
+  jenkins_home:
+  dind_data:
+
+networks:
+  smartdoc-net:
+    driver: bridge

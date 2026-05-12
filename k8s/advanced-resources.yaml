@@ -1,0 +1,112 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: smartdoc-backend-netpolicy
+  namespace: smartdoc-dev
+spec:
+  podSelector:
+    matchLabels:
+      app: smartdoc-backend
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 9092  # Kafka
+    - protocol: TCP
+      port: 53   # DNS
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: smartdoc-storage
+  namespace: smartdoc-dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: smartdoc-backup
+  namespace: smartdoc-dev
+spec:
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: smartdoc-backend
+          containers:
+          - name: backup
+            image: postgres:16-alpine
+            command:
+            - /bin/sh
+            - -c
+            - |
+              PGPASSWORD=${DATABASE_PASSWORD} pg_dump \
+              -h postgres \
+              -U ${DATABASE_USERNAME} \
+              smartdoc > /backup/smartdoc-$(date +%Y%m%d-%H%M%S).sql
+            env:
+            - name: DATABASE_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: smartdoc-backend-secrets
+                  key: DATABASE_USERNAME
+            - name: DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: smartdoc-backend-secrets
+                  key: DATABASE_PASSWORD
+            volumeMounts:
+            - name: backup
+              mountPath: /backup
+          volumes:
+          - name: backup
+            persistentVolumeClaim:
+              claimName: smartdoc-storage
+          restartPolicy: OnFailure
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: smartdoc-backend
+  namespace: smartdoc-dev
+  labels:
+    app: smartdoc-backend
+spec:
+  selector:
+    matchLabels:
+      app: smartdoc-backend
+  endpoints:
+  - port: http
+    path: /actuator/prometheus
+    interval: 30s
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: smartdoc-backend-pdb
+  namespace: smartdoc-dev
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: smartdoc-backend

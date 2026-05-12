@@ -1,0 +1,156 @@
+jenkins:
+  systemMessage: "SmartDoc CI/CD Pipeline - Jenkins Master"
+  
+  securityRealm:
+    saml:
+      binding: "urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+      displayNameAttributeName: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
+      groupsAttributeName: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/groups"
+      idpMetadataConfiguration:
+        url: "http://idp-metadata-url" # Configure your IdP metadata URL
+      userNameAttributeName: "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress"
+
+  authorizationStrategy:
+    roleBased:
+      roles:
+        global:
+          - name: "admin"
+            permissions:
+              - "hudson.model.Hudson.Administer"
+          - name: "developer"
+            permissions:
+              - "hudson.model.Hudson.Read"
+              - "hudson.model.Item.Build"
+              - "hudson.model.Item.Cancel"
+              - "hudson.model.Item.Read"
+
+  crumbIssuer:
+    standard: {}
+
+  remotingSecurity:
+    enabled: true
+
+  remoteCLI:
+    enabled: false
+
+  agentProtocols:
+    - "JNLP4-connect"
+    - "Ping"
+
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - scope: GLOBAL
+            id: "docker-hub-credentials"
+            username: "${DOCKER_USERNAME}"
+            password: "${DOCKER_PASSWORD}"
+            description: "Docker Hub Credentials"
+            _class: "com.cloudbees.plugins.credentials.impl.UsernamePasswordCredentialsImpl"
+
+          - scope: GLOBAL
+            id: "sonar-token"
+            secret: "${SONAR_TOKEN}"
+            description: "SonarQube Token"
+            _class: "org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl"
+
+          - scope: GLOBAL
+            id: "github-token"
+            secret: "${GITHUB_TOKEN}"
+            description: "GitHub Personal Access Token"
+            _class: "org.jenkinsci.plugins.plaincredentials.impl.StringCredentialsImpl"
+
+unclassified:
+  location:
+    url: "http://jenkins:8080/"
+  
+  sonarGlobalConfiguration:
+    installations:
+      - name: "SonarQube"
+        serverUrl: "http://sonarqube:9000"
+        credentialsId: "sonar-token"
+        monoVersionSelector: "Latest release"
+
+  gitHub:
+    apiRateLimitChecker: ThrottleForNormalize
+    clientCacheSize: 20
+    connectionTimeout: 20
+    notifications: []
+    readTimeout: 10
+    username: "${GITHUB_USERNAME}"
+    personalAccessToken: "${GITHUB_TOKEN}"
+
+  pipeline:
+    model:
+      defaults:
+        timeout:
+          activity: true
+          time: 60
+          unit: "MINUTES"
+
+  timestamper:
+    allPipelines: true
+    elapsedTimeFormat: "'['HH:mm:ss.S']' "
+    systemTimeFormat: "'['yyyy-MM-dd HH:mm:ss.S Z']' "
+
+security:
+  apiToken:
+    creationOfLegacyTokenEnabled: false
+
+  scriptApproval:
+    # Add script hashes as needed
+    aclApproved: []
+    fileExtensionApproved: []
+
+tool:
+  maven:
+    installations:
+      - name: "Maven 3.9"
+        home: "/usr/share/maven"
+        properties:
+          - name: "M2_HOME"
+            value: "/usr/share/maven"
+
+  jdk:
+    installations:
+      - name: "JDK 17"
+        home: "/opt/java/openjdk"
+
+  git:
+    installations:
+      - name: "git"
+        home: "git"
+
+jobs:
+  - script: >
+      pipelineJob('smartdoc-backend-pipeline') {
+        description('SmartDoc Backend CI/CD Pipeline')
+        
+        triggers {
+          githubPush()
+        }
+        
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('https://github.com/YOUR_USERNAME/Smart-Doc-Backend-auth.git')
+                  credentials('github-token')
+                }
+                branches('*/main', '*/develop')
+              }
+            }
+            scriptPath('Jenkinsfile')
+            lightweight(false)
+          }
+        }
+        
+        properties {
+          pipelineTriggers {
+            triggers {
+              githubPush()
+            }
+          }
+        }
+      }

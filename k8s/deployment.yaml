@@ -1,0 +1,228 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: smartdoc-backend-config
+  namespace: smartdoc-dev
+data:
+  APPLICATION_NAME: "SmartDoc Backend"
+  JAVA_OPTS: "-Xms256m -Xmx512m -XX:+UseG1GC"
+  LOG_LEVEL: "INFO"
+  SPRING_PROFILES_ACTIVE: "dev"
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: smartdoc-backend-secrets
+  namespace: smartdoc-dev
+type: Opaque
+stringData:
+  DATABASE_URL: "jdbc:postgresql://postgres:5432/smartdoc"
+  DATABASE_USERNAME: "smartdoc"
+  DATABASE_PASSWORD: "changeme"
+  JWT_SECRET: "your-jwt-secret-key-change-in-production"
+  KAFKA_BROKERS: "kafka:9092"
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: smartdoc-backend
+  namespace: smartdoc-dev
+  labels:
+    app: smartdoc-backend
+    version: v1
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: smartdoc-backend
+  template:
+    metadata:
+      labels:
+        app: smartdoc-backend
+        version: v1
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8080"
+        prometheus.io/path: "/actuator/prometheus"
+    spec:
+      serviceAccountName: smartdoc-backend
+      imagePullSecrets:
+        - name: regcred
+      containers:
+      - name: smartdoc-backend
+        image: docker.io/smartdoc-backend-auth:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 8080
+          name: http
+          protocol: TCP
+        env:
+        - name: SPRING_PROFILES_ACTIVE
+          valueFrom:
+            configMapKeyRef:
+              name: smartdoc-backend-config
+              key: SPRING_PROFILES_ACTIVE
+        - name: JAVA_OPTS
+          valueFrom:
+            configMapKeyRef:
+              name: smartdoc-backend-config
+              key: JAVA_OPTS
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: smartdoc-backend-secrets
+              key: DATABASE_URL
+        - name: DATABASE_USERNAME
+          valueFrom:
+            secretKeyRef:
+              name: smartdoc-backend-secrets
+              key: DATABASE_USERNAME
+        - name: DATABASE_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: smartdoc-backend-secrets
+              key: DATABASE_PASSWORD
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: smartdoc-backend-secrets
+              key: JWT_SECRET
+        - name: KAFKA_BROKERS
+          valueFrom:
+            secretKeyRef:
+              name: smartdoc-backend-secrets
+              key: KAFKA_BROKERS
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /actuator/health/liveness
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /actuator/health/readiness
+            port: 8080
+          initialDelaySeconds: 20
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          runAsNonRoot: true
+          runAsUser: 1000
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+              - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: cache
+          mountPath: /app/cache
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: cache
+        emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - smartdoc-backend
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: smartdoc-backend
+  namespace: smartdoc-dev
+  labels:
+    app: smartdoc-backend
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP
+    name: http
+  selector:
+    app: smartdoc-backend
+---
+apiVersion: autoscaling.k8s.io/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: smartdoc-backend-hpa
+  namespace: smartdoc-dev
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: smartdoc-backend
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: smartdoc-backend
+  namespace: smartdoc-dev
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: smartdoc-backend
+  namespace: smartdoc-dev
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: smartdoc-backend
+  namespace: smartdoc-dev
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: smartdoc-backend
+subjects:
+- kind: ServiceAccount
+  name: smartdoc-backend
+  namespace: smartdoc-dev
