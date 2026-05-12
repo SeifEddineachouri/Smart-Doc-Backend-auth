@@ -12,7 +12,7 @@ COPY src ./src
 RUN mvn -q -DskipTests clean package
 
 # Stage 2: Runtime
-FROM eclipse-temurin:17-jre-slim
+FROM eclipse-temurin:17-jre
 
 # Install runtime dependencies
 RUN apt-get update \
