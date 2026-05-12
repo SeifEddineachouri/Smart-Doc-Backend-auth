@@ -41,12 +41,6 @@ jobs:
           - service: smartdoc
             context: .
             image: smartdoc-backend-auth
-          - service: aismartdoc
-            context: ./AiSmartDoc
-            image: smartdoc-backend-fast-api
-          - service: smartdoc-ai
-            context: ./smartdoc-ai
-            image: smartdoc-backend-python
 
     steps:
       - name: Checkout
