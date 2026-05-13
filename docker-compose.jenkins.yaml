@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:16-alpine
+    container_name: smartdoc-postgres
+    environment:
+      POSTGRES_DB: smartdoc
+      POSTGRES_USER: smartdoc
+      POSTGRES_PASSWORD: smartdoc123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - smartdoc-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U smartdoc"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # SonarQube
+  sonarqube:
+    image: sonarqube:10.0-community
+    container_name: smartdoc-sonarqube
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://postgres:5432/smartdoc
+      SONAR_JDBC_USERNAME: smartdoc
+      SONAR_JDBC_PASSWORD: smartdoc123
+      SONAR_ES_BOOTSTRAP_CHECKS_DISABLED: "true"
+    ports:
+      - "9000:9000"
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_logs:/opt/sonarqube/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - smartdoc-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/system/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # Jenkins Master
+  jenkins:
+    image: jenkins/jenkins:2.426.3-jdk17
+    container_name: smartdoc-jenkins
+    environment:
+      JENKINS_OPTS: "-Djenkins.install.runSetupWizard=false"
+      CASC_JENKINS_CONFIG: /var/jenkins_home/casc_configs
+    ports:
+      - "8080:8080"
+      - "50000:50000"
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./jenkins-config:/var/jenkins_home/casc_configs:ro
+    depends_on:
+      sonarqube:
+        condition: service_healthy
+    networks:
+      - smartdoc-net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/json"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+volumes:
+  postgres_data:
+  sonarqube_data:
+  sonarqube_logs:
+  jenkins_home:
+
+networks:
+  smartdoc-net:
+    driver: bridge
