@@ -107,12 +107,13 @@ The script checks:
 
 The repository includes a GitHub Actions workflow that publishes the three service images to Docker Hub.
 It validates the required secrets first, uses a safe namespace fallback, and publishes only from trusted Git events.
+The images are currently published and verified under the `seifeddineachouri1999` namespace.
 
 The published images are:
 
-- `smartdoc` → `docker.io/<namespace>/smartdoc-backend-auth`
-- `AiSmartDoc` → `docker.io/<namespace>/smartdoc-backend-fast-api`
-- `smartdoc-ai` → `docker.io/<namespace>/smartdoc-backend-python`
+- `smartdoc` → `docker.io/seifeddineachouri1999/smartdoc-backend-auth`
+- `AiSmartDoc` → `docker.io/seifeddineachouri1999/smartdoc-backend-fast-api`
+- `smartdoc-ai` → `docker.io/seifeddineachouri1999/smartdoc-backend-python`
 
 ### Required GitHub secrets
 
@@ -142,9 +143,9 @@ Make sure the target repositories already exist in Docker Hub under that namespa
 ### Pull the images
 
 ```powershell
-docker pull <namespace>/smartdoc-backend-auth:latest
-docker pull <namespace>/smartdoc-backend-fast-api:latest
-docker pull <namespace>/smartdoc-backend-python:latest
+docker pull seifeddineachouri1999/smartdoc-backend-auth:latest
+docker pull seifeddineachouri1999/smartdoc-backend-fast-api:latest
+docker pull seifeddineachouri1999/smartdoc-backend-python:latest
 ```
 
 ## One-click relaunch and verification
