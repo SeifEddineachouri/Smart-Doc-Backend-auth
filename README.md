@@ -72,6 +72,14 @@ docker compose down
 - Uploaded files are persisted through the host `uploads/` folder.
 - Kafka is included for the audit stream; `smartdoc` uses `kafka:9092` inside Compose by default.
 - The Angular frontend is served from the local `smartdoc-frontend:local` image and proxies `/api/v1` to `smartdoc:8087`.
+- Upload limits are configurable via `APP_UPLOAD_MAX_FILE_SIZE` and `APP_UPLOAD_MAX_REQUEST_SIZE` (defaults: `100MB`).
+- If you place Nginx/Ingress in front of the app, also raise `client_max_body_size` to avoid `413 Request Entity Too Large` before the request reaches Spring.
+
+Example Nginx setting:
+
+```nginx
+client_max_body_size 100M;
+```
 
 ### Frontend URL
 
