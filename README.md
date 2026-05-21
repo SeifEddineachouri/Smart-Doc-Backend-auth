@@ -40,6 +40,7 @@ This repository now includes a Docker Compose setup for the full SmartDoc stack:
 - `smartdoc` on port `8087`
 - `AiSmartDoc` on port `8088`
 - `smartdoc-ai` on port `8000`
+- `payment-service` on port `8089`
 - `frontend` on port `4200`
 - `postgres` on port `5432`
 - `kafka` on port `9092`
@@ -72,6 +73,7 @@ docker compose down
 - Uploaded files are persisted through the host `uploads/` folder.
 - Kafka is included for the audit stream; `smartdoc` uses `kafka:9092` inside Compose by default.
 - The Angular frontend is served from the local `smartdoc-frontend:local` image and proxies `/api/v1` to `smartdoc:8087`.
+- The payment microservice is implemented as a Spring Boot app in `payment-service-spring/`.
 - Upload limits are configurable via `APP_UPLOAD_MAX_FILE_SIZE` and `APP_UPLOAD_MAX_REQUEST_SIZE` (defaults: `100MB`).
 - If you place Nginx/Ingress in front of the app, also raise `client_max_body_size` to avoid `413 Request Entity Too Large` before the request reaches Spring.
 
