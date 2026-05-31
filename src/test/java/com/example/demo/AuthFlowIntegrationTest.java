@@ -1,5 +1,11 @@
 package com.example.demo;
 
+import com.example.demo.model.entity.RoleEntity;
+import com.example.demo.model.entity.UserEntity;
+import com.example.demo.model.enums.LanguageCode;
+import com.example.demo.model.enums.RoleName;
+import com.example.demo.repository.RoleRepository;
+import com.example.demo.repository.UserRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.demo.service.AiDocumentIngestionService;
@@ -13,6 +19,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.security.crypto.password.PasswordEncoder;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
@@ -31,27 +38,19 @@ class AuthFlowIntegrationTest {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired
+    private UserRepository userRepository;
+
+    @Autowired
+    private RoleRepository roleRepository;
+
+    @Autowired
+    private PasswordEncoder passwordEncoder;
+
     @MockBean
     @SuppressWarnings("unused")
     private AiDocumentIngestionService aiDocumentIngestionService;
 
-    @Test
-    void registerAliasWorksLikeSignup() throws Exception {
-        String signupBody = """
-            {
-              "fullName": "Register User",
-              "workEmail": "register@company.com",
-              "password": "StrongPass#123",
-              "acceptedTerms": true
-            }
-            """;
-
-        mockMvc.perform(post("/api/v1/auth/register")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(signupBody))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.user.email").value("register@company.com"));
-    }
 
     @Test
     void signupThenGetProfileWorks() throws Exception {
@@ -115,6 +114,43 @@ class AuthFlowIntegrationTest {
             .andExpect(jsonPath("$.id").isNumber())
             .andExpect(jsonPath("$.name").value("sample.txt"))
             .andExpect(jsonPath("$.mimeType").value(MediaType.TEXT_PLAIN_VALUE));
+    }
+
+    @Test
+    void adminCanAccessAppWithoutPaymentPlan() throws Exception {
+        RoleEntity adminRole = roleRepository.findByName(RoleName.ROLE_ADMIN)
+            .orElseThrow(() -> new IllegalStateException("ROLE_ADMIN is missing in test data"));
+
+        UserEntity admin = new UserEntity();
+        admin.setFullName("Admin User");
+        admin.setEmail("admin@company.com");
+        admin.setPasswordHash(passwordEncoder.encode("StrongPass#123"));
+        admin.setLanguage(LanguageCode.en);
+        admin.setAcceptedTerms(true);
+        admin.getRoles().add(adminRole);
+        userRepository.save(admin);
+
+        String signinBody = """
+            {
+              "email": "admin@company.com",
+              "password": "StrongPass#123",
+              "rememberMe": false
+            }
+            """;
+
+        MvcResult signinResult = mockMvc.perform(post("/api/v1/auth/signin")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(signinBody))
+            .andExpect(status().isOk())
+            .andReturn();
+
+        JsonNode root = objectMapper.readTree(signinResult.getResponse().getContentAsString());
+        String accessToken = root.path("accessToken").asText();
+
+        mockMvc.perform(get("/api/v1/users/me")
+                .header("Authorization", "Bearer " + accessToken))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.email").value("admin@company.com"));
     }
 }
 

@@ -76,16 +76,21 @@ Owns:
 
 ## Environment Variables
 - `PAYMENT_PROVIDER=stripe`
+- `PAYMENT_CHECKOUT_MODE=stripe`
 - `PAYMENT_CHECKOUT_BASE_URL=https://checkout.stripe.com/pay`
+- `PAYMENT_CHECKOUT_RETURN_URL=http://localhost:4200/billing/success`
+- `PAYMENT_CHECKOUT_CANCEL_URL=http://localhost:4200/billing/cancel`
 - `PAYMENT_STRIPE_WEBHOOK_SECRET=...`
 - `PAYMENT_INTERNAL_TOKEN=...`
 - `PAYMENT_WEBHOOK_TOLERANCE_SECONDS=300`
 - `PAYMENT_DEFAULT_PLAN_ID=pro-monthly`
 - `PAYMENT_DEFAULT_PLAN_NAME=SmartDoc Pro Monthly`
 - `PAYMENT_DEFAULT_PLAN_PRICE_CENTS=1999`
-- `PAYMENT_DEFAULT_PLAN_CURRENCY=usd`
+- `PAYMENT_DEFAULT_PLAN_CURRENCY=eur`
 - `PAYMENT_DEFAULT_PLAN_INTERVAL=month`
 - `PAYMENT_DEFAULT_PLAN_ACTIVE=true`
+
+The local scaffold also includes a `starter-pack` plan and uses `eur` by default for both plans.
 
 ## Security Rules
 - Never trust the frontend for payment success.

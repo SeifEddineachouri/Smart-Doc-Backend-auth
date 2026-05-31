@@ -1,5 +1,6 @@
 package com.example.smartdoc.payment.repository;
 
+import com.example.smartdoc.payment.config.PaymentProperties;
 import com.example.smartdoc.payment.model.CheckoutSession;
 import com.example.smartdoc.payment.model.Entitlement;
 import com.example.smartdoc.payment.model.Plan;
@@ -7,9 +8,9 @@ import com.example.smartdoc.payment.model.RefundRecord;
 import com.example.smartdoc.payment.model.WebhookEventRecord;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.stereotype.Repository;
 
@@ -22,13 +23,24 @@ public class InMemoryPaymentRepository implements PaymentRepository {
     private final Map<String, String> idempotencyIndex = new ConcurrentHashMap<>();
     private final Map<String, RefundRecord> refunds = new ConcurrentHashMap<>();
 
-    public InMemoryPaymentRepository(Plan defaultPlan) {
+    public InMemoryPaymentRepository(PaymentProperties properties) {
+        Plan defaultPlan = properties.defaultPlan().toDomain();
         this.plans.put(defaultPlan.id(), defaultPlan);
+        List<PaymentProperties.PlanConfig> additionalPlans = properties.additionalPlans() == null ? List.of() : properties.additionalPlans();
+        for (PaymentProperties.PlanConfig planConfig : additionalPlans) {
+            Plan plan = planConfig.toDomain();
+            this.plans.put(plan.id(), plan);
+        }
     }
 
     @Override
     public Plan getPlan(String planId) {
         return plans.get(planId);
+    }
+
+    @Override
+    public java.util.Collection<Plan> listPlans() {
+        return List.copyOf(plans.values());
     }
 
     @Override

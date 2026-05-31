@@ -26,6 +26,7 @@ public class DocumentService {
     private final UserRepository userRepository;
     private final AiDocumentIngestionService aiDocumentIngestionService;
     private final ChatSessionService chatSessionService;
+    private final AuditEventPublisher auditEventPublisher;
     private final Path baseDir;
 
     public DocumentService(
@@ -33,12 +34,14 @@ public class DocumentService {
         UserRepository userRepository,
         AiDocumentIngestionService aiDocumentIngestionService,
         ChatSessionService chatSessionService,
+        AuditEventPublisher auditEventPublisher,
         DocumentProperties properties
     ) {
         this.documentRepository = documentRepository;
         this.userRepository = userRepository;
         this.aiDocumentIngestionService = aiDocumentIngestionService;
         this.chatSessionService = chatSessionService;
+        this.auditEventPublisher = auditEventPublisher;
         this.baseDir = Path.of(properties.storageDir()).toAbsolutePath().normalize();
     }
 
@@ -80,6 +83,7 @@ public class DocumentService {
         // Best-effort ingestion: upload remains successful even if AI gateway is unavailable.
         aiDocumentIngestionService.ingestOnUpload(userId, saved.getId(), file, mimeType, originalName);
         chatSessionService.touchSession(session);
+        auditEventPublisher.documentUploaded(userId, saved.getId(), session.getId(), mimeType, saved.getSizeBytes());
 
         return new UploadDocumentResponseDto(
             saved.getId(),
@@ -126,6 +130,7 @@ public class DocumentService {
         } catch (IOException ignored) {
             // Non-blocking cleanup; metadata deletion already succeeded.
         }
+        auditEventPublisher.documentDeleted(userId, documentId, document.getSession().getId());
     }
 
     private String formatBytes(long sizeBytes) {

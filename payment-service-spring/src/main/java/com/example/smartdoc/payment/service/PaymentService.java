@@ -17,6 +17,12 @@ import com.example.smartdoc.payment.web.dto.RefundResponse;
 import com.example.smartdoc.payment.web.dto.WebhookResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -24,10 +30,10 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.nio.charset.StandardCharsets;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
 public class PaymentService {
@@ -113,8 +119,9 @@ public class PaymentService {
     }
 
     private CheckoutSessionResponse createCheckoutSessionInternal(CheckoutSessionCreateRequest request, Plan plan) {
-        String sessionId = randomId("cs");
-        String checkoutUrl = buildCheckoutUrl(sessionId, request.successUrl(), request.cancelUrl());
+        CheckoutSessionCreationResult checkoutSession = properties.useStripeCheckout()
+            ? createStripeCheckoutSession(request, plan)
+            : createMockCheckoutSession(request, plan);
         Map<String, String> metadata = new LinkedHashMap<>();
         metadata.put("user_id", request.userId());
         metadata.put("plan_id", plan.id());
@@ -123,11 +130,11 @@ public class PaymentService {
         }
 
         CheckoutSession session = new CheckoutSession(
-            sessionId,
+            checkoutSession.sessionId(),
             request.userId(),
             plan.id(),
             "pending",
-            checkoutUrl,
+            checkoutSession.checkoutUrl(),
             request.idempotencyKey(),
             metadata,
             Instant.now(clock),
@@ -203,16 +210,17 @@ public class PaymentService {
         }
 
         String normalizedRequestedPlanId = normalizePlanIdentifier(trimmedRequestedPlanId);
-        String normalizedDefaultPlanId = normalizePlanIdentifier(defaultPlan.id());
-        String normalizedDefaultPlanName = normalizePlanIdentifier(defaultPlan.name());
-
-        if (normalizedRequestedPlanId.equals(normalizedDefaultPlanId)
-            || normalizedRequestedPlanId.equals(normalizedDefaultPlanName)
-            || normalizedDefaultPlanId.contains(normalizedRequestedPlanId)
-            || normalizedDefaultPlanName.contains(normalizedRequestedPlanId)
-            || normalizedRequestedPlanId.contains(normalizedDefaultPlanId)
-            || normalizedRequestedPlanId.contains(normalizedDefaultPlanName)) {
-            return defaultRepositoryPlan;
+        for (Plan candidate : repository.listPlans()) {
+            String normalizedCandidateId = normalizePlanIdentifier(candidate.id());
+            String normalizedCandidateName = normalizePlanIdentifier(candidate.name());
+            if (normalizedRequestedPlanId.equals(normalizedCandidateId)
+                || normalizedRequestedPlanId.equals(normalizedCandidateName)
+                || normalizedCandidateId.contains(normalizedRequestedPlanId)
+                || normalizedCandidateName.contains(normalizedRequestedPlanId)
+                || normalizedRequestedPlanId.contains(normalizedCandidateId)
+                || normalizedRequestedPlanId.contains(normalizedCandidateName)) {
+                return candidate;
+            }
         }
 
         return null;
@@ -222,17 +230,120 @@ public class PaymentService {
         return value == null ? "" : value.trim().toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
     }
 
-    private String buildCheckoutUrl(String sessionId, String successUrl, String cancelUrl) {
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(properties.checkoutBaseUrl())
-            .queryParam("session_id", sessionId);
+    private CheckoutSessionCreationResult createMockCheckoutSession(CheckoutSessionCreateRequest request, Plan plan) {
+        String sessionId = randomId("cs");
+        String checkoutUrl = buildMockCheckoutUrl(sessionId, request.successUrl(), request.cancelUrl());
+        return new CheckoutSessionCreationResult(sessionId, checkoutUrl);
+    }
+
+    private CheckoutSessionCreationResult createStripeCheckoutSession(CheckoutSessionCreateRequest request, Plan plan) {
+        String secretKey = properties.stripeSecretKey();
+        if (secretKey == null || secretKey.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Stripe checkout is enabled but PAYMENT_STRIPE_SECRET_KEY is missing");
+        }
+
+        String successUrl = resolveReturnUrl(request.successUrl(), properties.checkoutReturnUrl());
+        String cancelUrl = resolveReturnUrl(request.cancelUrl(), properties.checkoutCancelUrl());
+        if (successUrl == null || successUrl.isBlank() || cancelUrl == null || cancelUrl.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Stripe checkout requires success and cancel URLs");
+        }
+
+        String responseBody;
+        int statusCode;
+        try {
+            HttpURLConnection connection = (HttpURLConnection) new URL("https://api.stripe.com/v1/checkout/sessions").openConnection();
+            connection.setConnectTimeout(10_000);
+            connection.setReadTimeout(10_000);
+            connection.setRequestMethod("POST");
+            connection.setDoOutput(true);
+            connection.setRequestProperty("Authorization", "Bearer " + secretKey.trim());
+            connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
+
+            String payload = buildStripeCheckoutForm(request, plan, successUrl, cancelUrl);
+            try (OutputStream outputStream = connection.getOutputStream()) {
+                outputStream.write(payload.getBytes(StandardCharsets.UTF_8));
+            }
+
+            statusCode = connection.getResponseCode();
+            InputStream responseStream = statusCode >= 200 && statusCode < 300 ? connection.getInputStream() : connection.getErrorStream();
+            if (responseStream == null) {
+                responseBody = "";
+            } else {
+                responseBody = new String(responseStream.readAllBytes(), StandardCharsets.UTF_8);
+            }
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unable to reach Stripe checkout API", ex);
+        }
+
+        if (statusCode < 200 || statusCode >= 300) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Stripe checkout session creation failed: " + responseBody);
+        }
+
+        try {
+            JsonNode json = objectMapper.readTree(responseBody);
+            String sessionId = requiredText(json, "id");
+            String checkoutUrl = requiredText(json, "url");
+            return new CheckoutSessionCreationResult(sessionId, checkoutUrl);
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Stripe checkout session response was invalid", ex);
+        }
+    }
+
+    private String buildStripeCheckoutForm(CheckoutSessionCreateRequest request, Plan plan, String successUrl, String cancelUrl) {
+        Map<String, String> fields = new LinkedHashMap<>();
+        fields.put("mode", "subscription");
+        fields.put("success_url", successUrl);
+        fields.put("cancel_url", cancelUrl);
+        fields.put("line_items[0][quantity]", "1");
+        fields.put("line_items[0][price_data][currency]", plan.currency());
+        fields.put("line_items[0][price_data][product_data][name]", plan.name());
+        fields.put("line_items[0][price_data][unit_amount]", Integer.toString(plan.priceCents()));
+        fields.put("line_items[0][price_data][recurring][interval]", plan.interval());
+        fields.put("metadata[user_id]", request.userId());
+        fields.put("metadata[plan_id]", plan.id());
+        if (request.customerEmail() != null && !request.customerEmail().isBlank()) {
+            fields.put("customer_email", request.customerEmail());
+        }
+
+        StringBuilder body = new StringBuilder();
+        for (Map.Entry<String, String> entry : fields.entrySet()) {
+            if (body.length() > 0) {
+                body.append('&');
+            }
+            body.append(urlEncode(entry.getKey()));
+            body.append('=');
+            body.append(urlEncode(entry.getValue()));
+        }
+        return body.toString();
+    }
+
+    private String resolveReturnUrl(String requestValue, String fallbackValue) {
+        if (requestValue != null && !requestValue.isBlank()) {
+            return requestValue;
+        }
+        return fallbackValue;
+    }
+
+    private String buildMockCheckoutUrl(String sessionId, String successUrl, String cancelUrl) {
+        StringBuilder builder = new StringBuilder(properties.checkoutBaseUrl())
+            .append("?session_id=")
+            .append(urlEncode(sessionId));
         if (successUrl != null && !successUrl.isBlank()) {
-            builder.queryParam("success_url", successUrl);
+            builder.append("&success_url=").append(urlEncode(successUrl));
         }
         if (cancelUrl != null && !cancelUrl.isBlank()) {
-            builder.queryParam("cancel_url", cancelUrl);
+            builder.append("&cancel_url=").append(urlEncode(cancelUrl));
         }
-        return builder.build().toUriString();
+        return builder.toString();
     }
+
+    private String urlEncode(String value) {
+        return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    private record CheckoutSessionCreationResult(String sessionId, String checkoutUrl) {}
+
+    private record WebhookTarget(String userId, String planId, CheckoutSession session) {}
 
     private JsonNode parseJson(byte[] payload) {
         try {
@@ -288,7 +399,6 @@ public class PaymentService {
         return prefix + "_" + UUID.randomUUID().toString().replace("-", "");
     }
 
-    private record WebhookTarget(String userId, String planId, CheckoutSession session) {}
 }
 
 

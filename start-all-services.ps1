@@ -176,15 +176,6 @@ if (-not [string]::IsNullOrWhiteSpace($effectiveServiceToken)) {
     Set-Item -Path "Env:APP_AI_GATEWAY_SERVICE_TOKEN" -Value $effectiveServiceToken
 }
 
-$logDirectory = Join-Path $smartdocPath "logs"
-if (-not (Test-Path -LiteralPath $logDirectory)) {
-    New-Item -ItemType Directory -Path $logDirectory | Out-Null
-}
-
-$serviceTokenFile = Join-Path $logDirectory "service-token.txt"
-if (-not [string]::IsNullOrWhiteSpace($effectiveServiceToken)) {
-    Set-Content -LiteralPath $serviceTokenFile -Value $effectiveServiceToken -NoNewline
-}
 
 Set-EnvIfMissing -Name "APP_AI_BASE_URL" -Value "http://localhost:8000"
 Set-EnvIfMissing -Name "APP_AI_GATEWAY_BASE_URL" -Value "http://localhost:8088/api/v1/ai"

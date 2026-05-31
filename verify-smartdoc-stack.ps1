@@ -147,10 +147,11 @@ Assert-Command -Name 'docker'
 Assert-Command -Name 'Invoke-WebRequest'
 
 $localImages = @(
-    'smartdoc-frontend:local',
     'smartdoc:local',
     'aismartdoc:local',
     'smartdoc-ai:local',
+    'smartdoc-payment-service:latest',
+    'smartdoc-frontend:local',
     'postgres:16-alpine',
     'apache/kafka:3.8.1'
 )
@@ -177,6 +178,7 @@ Wait-ContainerHealthy -Name 'smartdoc-kafka' -TimeoutSec $TimeoutSec
 Wait-ContainerHealthy -Name 'smartdoc-ai' -TimeoutSec $TimeoutSec
 Wait-ContainerHealthy -Name 'aismartdoc' -TimeoutSec $TimeoutSec
 Wait-ContainerHealthy -Name 'smartdoc' -TimeoutSec $TimeoutSec
+Wait-ContainerHealthy -Name 'smartdoc-payment-service' -TimeoutSec $TimeoutSec
 Wait-ContainerHealthy -Name 'smartdoc-frontend' -TimeoutSec $TimeoutSec
 
 Write-Step 'Validating container environment wiring'
@@ -198,10 +200,11 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Step 'Validating HTTP endpoints'
-Wait-HttpOk -Name 'frontend root' -Url 'http://127.0.0.1:4200/' -TimeoutSec $TimeoutSec
 Wait-HttpOk -Name 'smartdoc-ai health' -Url 'http://127.0.0.1:8000/health' -TimeoutSec $TimeoutSec
 Wait-HttpOk -Name 'AiSmartDoc health' -Url 'http://127.0.0.1:8088/api/v1/ai/health' -TimeoutSec $TimeoutSec
 Wait-HttpOk -Name 'smartdoc OpenAPI' -Url 'http://127.0.0.1:8087/v3/api-docs' -TimeoutSec $TimeoutSec
+Wait-HttpOk -Name 'payment-service health' -Url 'http://127.0.0.1:8089/actuator/health' -TimeoutSec $TimeoutSec
+Wait-HttpOk -Name 'frontend health' -Url 'http://127.0.0.1:4200/health' -TimeoutSec $TimeoutSec
 
 if (-not $SkipRemotePull) {
     if ([string]::IsNullOrWhiteSpace($DockerHubNamespace)) {
@@ -221,12 +224,10 @@ if (-not $SkipRemotePull) {
 }
 
 Write-Step 'All checks passed'
-Write-Host '- Local images: smartdoc:local, aismartdoc:local, smartdoc-ai:local'
-Write-Host '- Frontend image: smartdoc-frontend:local'
+Write-Host '- Local images: smartdoc:local, aismartdoc:local, smartdoc-ai:local, smartdoc-payment-service:latest, smartdoc-frontend:local'
 Write-Host '- Database: PostgreSQL healthy and accepting connections'
 Write-Host '- Broker: Kafka healthy and responding'
-Write-Host '- Frontend: http://127.0.0.1:4200/'
-Write-Host '- HTTP: smartdoc-ai, AiSmartDoc, and smartdoc endpoints are healthy'
+Write-Host '- HTTP: smartdoc-ai, AiSmartDoc, smartdoc, payment-service, and frontend endpoints are healthy'
 if (-not $SkipRemotePull) {
     Write-Host "- Docker Hub: $DockerHubNamespace/$DockerHubTag images pulled successfully"
 }

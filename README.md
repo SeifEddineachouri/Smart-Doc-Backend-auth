@@ -73,7 +73,9 @@ docker compose down
 - Uploaded files are persisted through the host `uploads/` folder.
 - Kafka is included for the audit stream; `smartdoc` uses `kafka:9092` inside Compose by default.
 - The Angular frontend is served from the local `smartdoc-frontend:local` image and proxies `/api/v1` to `smartdoc:8087`.
-- The payment microservice is implemented as a Spring Boot app in `payment-service-spring/`.
+- The Angular frontend is built from `C:\Users\seifa\Desktop\SmartDoc` by default; override it with `SMARTDOC_FRONTEND_PATH` if you move the frontend folder.
+- The payment service is built from `payment-service-spring` and exposes `http://localhost:8089`.
+- The local payment service plans default to `eur` for both `pro-monthly` and `starter-pack`.
 - Upload limits are configurable via `APP_UPLOAD_MAX_FILE_SIZE` and `APP_UPLOAD_MAX_REQUEST_SIZE` (defaults: `100MB`).
 - If you place Nginx/Ingress in front of the app, also raise `client_max_body_size` to avoid `413 Request Entity Too Large` before the request reaches Spring.
 
@@ -111,6 +113,8 @@ The script checks:
 - `smartdoc-ai` health endpoint
 - `AiSmartDoc` health endpoint
 - `smartdoc` OpenAPI endpoint
+- `payment-service` health endpoint
+- frontend `/health` endpoint
 - optional Docker Hub pulls for the three published images
 
 ## Docker Hub publishing
@@ -202,3 +206,4 @@ For production, set environment variables or externalized properties for DB cred
 ## Kafka audit stream
 
 The backend now publishes best-effort audit events for document uploads/deletes and AI question flows. The default broker is `localhost:9092`; override it with `KAFKA_BOOTSTRAP_SERVERS` when running against a real cluster.
+

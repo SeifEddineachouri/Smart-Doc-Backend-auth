@@ -97,6 +97,9 @@ Use:
 - `PAYMENT_CHECKOUT_RETURN_URL=http://localhost:4200/billing/success`
 - `PAYMENT_CHECKOUT_CANCEL_URL=http://localhost:4200/billing/cancel`
 
+## Current local pricing
+- The local payment service scaffold returns `eur` for the available plans.
+
 ## Security rules
 - Never trust the frontend alone for payment success.
 - Always rely on the backend entitlement endpoint after the checkout redirect.

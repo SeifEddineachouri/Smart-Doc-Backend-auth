@@ -13,16 +13,26 @@ management:
 
 payment:
   provider: stripe
+  checkout-mode: mock
   checkout-base-url: https://checkout.stripe.com/pay
+  checkout-return-url: http://localhost:4200/billing/success
+  checkout-cancel-url: http://localhost:4200/billing/cancel
   stripe-secret-key: ${PAYMENT_STRIPE_SECRET_KEY:}
   stripe-webhook-secret: dev-webhook-secret
   internal-token: dev-internal-token
   webhook-tolerance-seconds: 300
+  additional-plans:
+    - id: starter-pack
+      name: Starter Pack
+      price-cents: 999
+      currency: eur
+      interval: month
+      active: true
   default-plan:
     id: pro-monthly
     name: SmartDoc Pro Monthly
     price-cents: 1999
-    currency: usd
+    currency: eur
     interval: month
     active: true
 

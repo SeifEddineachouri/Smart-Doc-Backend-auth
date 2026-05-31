@@ -31,8 +31,12 @@ class PaymentControllerTest {
 
     @Test
     void stripeSecretKeyIsLoadedFromEnvironment() {
+        String expected = System.getenv("PAYMENT_STRIPE_SECRET_KEY");
+        if (expected == null) {
+            expected = "";
+        }
         org.junit.jupiter.api.Assertions.assertEquals(
-            System.getenv("PAYMENT_STRIPE_SECRET_KEY"),
+            expected,
             properties.stripeSecretKey()
         );
     }
@@ -81,6 +85,22 @@ class PaymentControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.planId").value("pro-monthly"))
             .andExpect(jsonPath("$.planName").value("SmartDoc Pro Monthly"));
+    }
+
+    @Test
+    void checkoutSessionAcceptsStarterPackAlias() throws Exception {
+        mockMvc.perform(post("/api/v1/payments/checkout-session")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "userId": "user-starter",
+                      "planId": "starter pack"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.planId").value("starter-pack"))
+            .andExpect(jsonPath("$.planName").value("Starter Pack"))
+            .andExpect(jsonPath("$.currency").value("eur"));
     }
 
     @Test
