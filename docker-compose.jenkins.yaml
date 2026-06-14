@@ -1,16 +1,19 @@
-version: '3.8'
+# CI/CD stack (Jenkins + SonarQube). Runs as its own Compose project so it no
+# longer collides with the application stack in compose.yaml (which is project
+# "smartdoc"). Bring it up with:  docker compose -f docker-compose.jenkins.yaml up -d
+name: smartdoc-ci
 
 services:
-  # PostgreSQL Database
+  # PostgreSQL backing SonarQube (separate from the application database).
   postgres:
     image: postgres:16-alpine
-    container_name: smartdoc-postgres
+    container_name: smartdoc-ci-postgres
     environment:
       POSTGRES_DB: smartdoc
       POSTGRES_USER: smartdoc
       POSTGRES_PASSWORD: smartdoc123
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     networks:
@@ -67,7 +70,10 @@ volumes:
   postgres_data:
   sonarqube_data:
   sonarqube_logs:
+  # Reuse the existing Jenkins home volume so jobs/config survive the project rename.
   jenkins_home:
+    name: smartdoc_jenkins_home
+    external: true
 
 networks:
   smartdoc-net:
