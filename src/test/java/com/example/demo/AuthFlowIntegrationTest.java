@@ -68,6 +68,7 @@ class AuthFlowIntegrationTest {
                 .content(signupBody))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.user.email").value("jane@company.com"))
+            .andExpect(jsonPath("$.user.isAdmin").value(false))
             .andReturn();
 
         String payload = signupResult.getResponse().getContentAsString();
@@ -77,7 +78,8 @@ class AuthFlowIntegrationTest {
         mockMvc.perform(get("/api/v1/users/me")
                 .header("Authorization", "Bearer " + accessToken))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.email").value("jane@company.com"));
+            .andExpect(jsonPath("$.email").value("jane@company.com"))
+            .andExpect(jsonPath("$.isAdmin").value(false));
     }
 
     @Test
@@ -142,6 +144,7 @@ class AuthFlowIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(signinBody))
             .andExpect(status().isOk())
+            .andExpect(jsonPath("$.user.isAdmin").value(true))
             .andReturn();
 
         JsonNode root = objectMapper.readTree(signinResult.getResponse().getContentAsString());
@@ -150,7 +153,8 @@ class AuthFlowIntegrationTest {
         mockMvc.perform(get("/api/v1/users/me")
                 .header("Authorization", "Bearer " + accessToken))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.email").value("admin@company.com"));
+            .andExpect(jsonPath("$.email").value("admin@company.com"))
+            .andExpect(jsonPath("$.isAdmin").value(true));
     }
 }
 

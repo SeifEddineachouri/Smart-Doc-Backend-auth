@@ -80,8 +80,11 @@ public class DocumentService {
 
         DocumentEntity saved = documentRepository.save(entity);
 
-        // Best-effort ingestion: upload remains successful even if AI gateway is unavailable.
-        aiDocumentIngestionService.ingestOnUpload(userId, saved.getId(), file, mimeType, originalName);
+        // Best-effort, asynchronous ingestion: the upload response returns as soon
+        // as the file is persisted and metadata is committed. PDF extraction and the
+        // embedding round-trip run on a background pool, reading the file from its
+        // saved path rather than the request-scoped MultipartFile.
+        aiDocumentIngestionService.ingestOnUpload(userId, saved.getId(), target, mimeType, originalName);
         chatSessionService.touchSession(session);
         auditEventPublisher.documentUploaded(userId, saved.getId(), session.getId(), mimeType, saved.getSizeBytes());
 

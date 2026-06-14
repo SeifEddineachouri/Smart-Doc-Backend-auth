@@ -156,7 +156,8 @@ public class AuthService {
             user.getId().toString(),
             user.getFullName(),
             user.getEmail(),
-            user.getLanguage().name()
+            user.getLanguage().name(),
+            user.isAdmin()
         );
 
         AuthResponseDto response = new AuthResponseDto(accessToken, "Bearer", jwtTokenUtil.getAccessTokenSeconds(), userProfile);

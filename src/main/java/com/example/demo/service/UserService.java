@@ -39,7 +39,8 @@ public class UserService {
             user.getId().toString(),
             user.getFullName(),
             user.getEmail(),
-            user.getLanguage().name()
+            user.getLanguage().name(),
+            user.isAdmin()
         );
     }
 }

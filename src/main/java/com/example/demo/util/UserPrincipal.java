@@ -18,6 +18,10 @@ public class UserPrincipal implements UserDetails {
         return user;
     }
 
+    public boolean isAdmin() {
+        return user.isAdmin();
+    }
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         return user.getRoles().stream()

@@ -11,8 +11,10 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Transient;
 import jakarta.persistence.Table;
 import com.example.demo.model.enums.LanguageCode;
+import com.example.demo.model.enums.RoleName;
 import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
@@ -60,6 +62,11 @@ public class UserEntity {
         inverseJoinColumns = @JoinColumn(name = "role_id")
     )
     private Set<RoleEntity> roles = new HashSet<>();
+
+    @Transient
+    public boolean isAdmin() {
+        return roles != null && roles.stream().anyMatch(role -> role.getName() == RoleName.ROLE_ADMIN);
+    }
 
     @PrePersist
     void prePersist() {

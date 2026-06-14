@@ -96,6 +96,7 @@ export interface AuthUserProfile {
   fullName: string;
   email: string;
   language: LanguageCode;
+  isAdmin: boolean;
 }
 
 export interface AuthResponse {
@@ -167,6 +168,7 @@ Regles importantes:
 ### 5.2 UserService
 - `getMe(): Observable<AuthUserProfile>` -> `GET /users/me`
 - `updateLanguage(language: LanguageCode): Observable<AuthUserProfile>` -> `PATCH /users/me/language`
+- Le profil retourné contient `isAdmin` pour router directement les admins vers le chat sans paywall.
 
 ### 5.3 DocumentService
 - `upload(file: File): Observable<UploadedDocument>` -> multipart `file`
@@ -225,6 +227,7 @@ Regles importantes:
 
 ### 7.3 (Optionnel) `RoleGuard`
 - Preparer le support role-based si besoin futur (`ROLE_ADMIN`).
+- Si `currentUser.isAdmin === true`, rediriger directement vers `/chat` et bypasser l’etape de paiement.
 
 ---
 
@@ -238,7 +241,8 @@ Minimum attendu:
 Au boot app:
 1. tenter `refresh()` (silent)
 2. si succes -> `getMe()`
-3. sinon -> utilisateur non connecte
+3. si `currentUser.isAdmin === true` -> rediriger directement vers `/chat`
+4. sinon -> appliquer le parcours standard ou le paywall
 
 ---
 

@@ -70,6 +70,49 @@ public class PaymentService {
         return mapEntitlementResponse(getEntitlementInternal(userId));
     }
 
+    /**
+     * Confirms a checkout session on the user's return from Stripe. Stripe's
+     * checkout.session.completed webhook is the source of truth, but it may be
+     * delayed or undeliverable in local setups, so here we query Stripe directly
+     * for the session and activate the entitlement when payment has completed.
+     */
+    public EntitlementResponse confirmCheckout(String sessionId, String requestedUserId) {
+        if (sessionId == null || sessionId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "session_id is required");
+        }
+
+        CheckoutSession localSession = repository.findCheckoutSession(sessionId).orElse(null);
+        String userId = firstNonBlank(localSession != null ? localSession.userId() : null, requestedUserId);
+        String planId = localSession != null ? localSession.planId() : null;
+
+        if (properties.useStripeCheckout()) {
+            StripeSessionView view = fetchStripeSession(sessionId);
+            userId = firstNonBlank(userId, view.userId());
+            planId = firstNonBlank(planId, view.planId());
+            if (!view.paid()) {
+                if (userId == null || userId.isBlank()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unable to resolve user for checkout session");
+                }
+                return mapEntitlementResponse(getEntitlementInternal(userId));
+            }
+        } else if (localSession == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Checkout session not found");
+        }
+
+        if (userId == null || userId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unable to resolve user for checkout session");
+        }
+        if (planId == null || planId.isBlank()) {
+            planId = properties.defaultPlan().id();
+        }
+
+        Entitlement entitlement = repository.activateEntitlement(userId, planId, "checkout_confirm");
+        if (localSession != null) {
+            repository.completeCheckoutSession(sessionId);
+        }
+        return mapEntitlementResponse(entitlement);
+    }
+
     public PaymentStatusResponse getStatus(String userId) {
         EntitlementResponse entitlement = getEntitlement(userId);
         CheckoutSessionResponse latestCheckout = repository.findLatestCheckoutForUser(userId)
@@ -341,7 +384,61 @@ public class PaymentService {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
+    private StripeSessionView fetchStripeSession(String sessionId) {
+        String secretKey = properties.stripeSecretKey();
+        if (secretKey == null || secretKey.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "Stripe checkout is enabled but PAYMENT_STRIPE_SECRET_KEY is missing");
+        }
+
+        String responseBody;
+        int statusCode;
+        try {
+            String endpoint = "https://api.stripe.com/v1/checkout/sessions/" + urlEncode(sessionId);
+            HttpURLConnection connection = (HttpURLConnection) new URL(endpoint).openConnection();
+            connection.setConnectTimeout(10_000);
+            connection.setReadTimeout(10_000);
+            connection.setRequestMethod("GET");
+            connection.setRequestProperty("Authorization", "Bearer " + secretKey.trim());
+
+            statusCode = connection.getResponseCode();
+            InputStream responseStream = statusCode >= 200 && statusCode < 300 ? connection.getInputStream() : connection.getErrorStream();
+            responseBody = responseStream == null ? "" : new String(responseStream.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Unable to reach Stripe checkout API", ex);
+        }
+
+        if (statusCode == 404) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Checkout session not found at Stripe");
+        }
+        if (statusCode < 200 || statusCode >= 300) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Stripe checkout session retrieval failed: " + responseBody);
+        }
+
+        try {
+            JsonNode json = objectMapper.readTree(responseBody);
+            String paymentStatus = json.path("payment_status").asText("");
+            String sessionStatus = json.path("status").asText("");
+            boolean paid = "paid".equalsIgnoreCase(paymentStatus)
+                || "no_payment_required".equalsIgnoreCase(paymentStatus)
+                || "complete".equalsIgnoreCase(sessionStatus);
+            String userId = json.path("metadata").path("user_id").asText("");
+            String planId = json.path("metadata").path("plan_id").asText("");
+            return new StripeSessionView(paid, userId, planId);
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Stripe checkout session response was invalid", ex);
+        }
+    }
+
+    private String firstNonBlank(String first, String second) {
+        if (first != null && !first.isBlank()) {
+            return first;
+        }
+        return second;
+    }
+
     private record CheckoutSessionCreationResult(String sessionId, String checkoutUrl) {}
+
+    private record StripeSessionView(boolean paid, String userId, String planId) {}
 
     private record WebhookTarget(String userId, String planId, CheckoutSession session) {}
 

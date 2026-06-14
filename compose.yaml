@@ -161,7 +161,7 @@ services:
   frontend:
     image: smartdoc-frontend:local
     build:
-      context: "${SMARTDOC_FRONTEND_PATH:-C:/Users/seifa/Desktop/SmartDoc}"
+      context: "${SMARTDOC_FRONTEND_PATH:-C:\\Users\\seifa\\Desktop\\SmartDoc}"
     container_name: smartdoc-frontend
     restart: unless-stopped
     depends_on:

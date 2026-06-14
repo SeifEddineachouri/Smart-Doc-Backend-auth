@@ -4,7 +4,8 @@ public record UserProfileResponseDto(
     String id,
     String fullName,
     String email,
-    String language
+    String language,
+    boolean isAdmin
 ) {
 }
 
