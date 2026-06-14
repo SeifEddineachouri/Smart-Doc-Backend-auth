@@ -134,6 +134,9 @@ services:
     restart: unless-stopped
     environment:
       SERVER_PORT: 8089
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/SmartDoc
+      DB_USERNAME: ${POSTGRES_USER:-postgres}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-admin}
       PAYMENT_PROVIDER: ${PAYMENT_PROVIDER:-stripe}
       PAYMENT_CHECKOUT_MODE: ${PAYMENT_CHECKOUT_MODE:-stripe}
       PAYMENT_CHECKOUT_BASE_URL: ${PAYMENT_CHECKOUT_BASE_URL:-https://checkout.stripe.com/pay}
@@ -149,6 +152,9 @@ services:
       PAYMENT_DEFAULT_PLAN_CURRENCY: ${PAYMENT_DEFAULT_PLAN_CURRENCY:-eur}
       PAYMENT_DEFAULT_PLAN_INTERVAL: ${PAYMENT_DEFAULT_PLAN_INTERVAL:-month}
       PAYMENT_DEFAULT_PLAN_ACTIVE: ${PAYMENT_DEFAULT_PLAN_ACTIVE:-true}
+    depends_on:
+      postgres:
+        condition: service_healthy
     ports:
       - "8089:8089"
     healthcheck:
